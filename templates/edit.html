@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Blog Engine with net/http</title>
+	</head>
+	<body>
+		<h2>{{ .Title }}</h2>
+		<form action="/save/{{ .Title }}">
+			<textarea name="content" style="margin: 0px; height: 293px; width: 743px;">{{ printf "%s" .Content }}</textarea>
+			<br><br>
+			<input type="submit">
+		</form>
+	</body>
+</html>
