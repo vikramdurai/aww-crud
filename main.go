@@ -4,11 +4,12 @@ import (
 	"log"
 	"regexp"
 	"io/ioutil"
+	"os"
 	"net/http"
 	"errors"
 	"html/template"
 )
-//dds
+
 var validPath = regexp.MustCompile("^/(edit|save|show)/([a-zA-Z0-9]+)$")
 
 type Post struct {
@@ -27,6 +28,15 @@ func (p *Post) save() error {
 	return nil
 }
 
+func deletePost(title string) error {
+	filename := "posts/" + title + ".txt"
+	err := os.Remove(filename)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func loadPost(title string) (*Post, error) {
 	filename := "posts/" + title + ".txt"
 	content, err := ioutil.ReadFile(filename)
@@ -39,6 +49,23 @@ func loadPost(title string) (*Post, error) {
 
 	return p, nil
 } 
+
+func allPosts() ([]*Post, error) {
+	posts := make([]*Post, 1)
+	files, err := ioutil.ReadDir("posts")
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range files {
+		p, err := loadPost(f.Name())
+		if err != nil {
+			return nil, err
+		}
+
+		posts = append(posts, p)
+	}
+	return posts, nil
+}
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Post) {
 	t, err := template.ParseFiles("templates/" + tmpl + ".html")
@@ -59,7 +86,7 @@ func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
         http.NotFound(w, r)
         return "", errors.New("Invalid Post Title")
     }
-    return m[2], nil // The title is the second subexpression.
+    return m[2], nil
 }
 
 
@@ -129,18 +156,49 @@ func newHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func main() {
-	test := &Post{Title: "test", Content: "Hello, world!"}
-	err := test.save()
+func deleteHandler(w http.ResponseWriter, r *http.Request) {
+	title, err := getTitle(w, r)
 
 	if err != nil {
-		log.Fatal(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = deletePost(title)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	posts, err := allPosts()
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
+	t, err := template.ParseFiles("index.html")
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	err = t.Execute(w, posts)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func main() {
+	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/show/", showHandler)
 	http.HandleFunc("/edit/", editHandler)
 	http.HandleFunc("/save/", saveHandler)
 	http.HandleFunc("/new/", newHandler)
 	http.HandleFunc("/create/", createHandler)
+	http.HandleFunc("/delete/", deleteHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

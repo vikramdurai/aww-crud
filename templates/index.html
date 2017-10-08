@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Blog Engine with net/http</title>
+	</head>
+	<body>
+		{{ range . }}
+			<h2>{{ .Title }}</h2>
+			<p>{{ .Content }}</p>
+			<p><a href="/show/{{ .Title }}">show</a> or <a href="/delete/{{ .Title }}">delete</a></p>
+		{{ end }}
+	</body>
+</html>
