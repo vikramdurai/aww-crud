@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+	// "errors"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var validPath = regexp.MustCompile("^/(edit|save|show)/([a-zA-Z0-9]+)$")
+var validPath = regexp.MustCompile("^/(edit|save|show|delete)/([a-zA-Z0-9]+)$")
 
 type Post struct {
 	Title   string
@@ -84,10 +84,9 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Post) {
 func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
 	m := validPath.FindStringSubmatch(r.URL.Path)
 	if m == nil {
-		http.NotFound(w, r)
-		return "", errors.New("Invalid Post Title")
+		log.Fatal("this should never happen")
 	}
-	return string(m[2]), nil
+	return m[2], nil
 }
 
 func showHandler(w http.ResponseWriter, r *http.Request) {
