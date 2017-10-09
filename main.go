@@ -1,26 +1,27 @@
 package main
 
 import (
-	"log"
-	"regexp"
-	"io/ioutil"
-	"os"
-	"net/http"
 	"errors"
 	"html/template"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
+	"regexp"
+	"strings"
 )
 
 var validPath = regexp.MustCompile("^/(edit|save|show)/([a-zA-Z0-9]+)$")
 
 type Post struct {
-	Title string
+	Title   string
 	Content string
 }
 
 func (p *Post) save() error {
 	filename := "posts/" + p.Title + ".txt"
 	err := ioutil.WriteFile(filename, []byte(p.Content), 0600)
-	
+
 	if err != nil {
 		return err
 	}
@@ -48,7 +49,7 @@ func loadPost(title string) (*Post, error) {
 	p := &Post{Title: title, Content: string(content)}
 
 	return p, nil
-} 
+}
 
 func allPosts() ([]*Post, error) {
 	posts := make([]*Post, 1)
@@ -57,7 +58,7 @@ func allPosts() ([]*Post, error) {
 		return nil, err
 	}
 	for _, f := range files {
-		p, err := loadPost(f.Name())
+		p, err := loadPost(strings.Trim(f.Name(), ".txt"))
 		if err != nil {
 			return nil, err
 		}
@@ -81,14 +82,13 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Post) {
 }
 
 func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
-    m := validPath.FindStringSubmatch(r.URL.Path)
-    if m == nil {
-        http.NotFound(w, r)
-        return "", errors.New("Invalid Post Title")
-    }
-    return m[2], nil
+	m := validPath.FindStringSubmatch(r.URL.Path)
+	if m == nil {
+		http.NotFound(w, r)
+		return "", errors.New("Invalid Post Title")
+	}
+	return string(m[2]), nil
 }
-
 
 func showHandler(w http.ResponseWriter, r *http.Request) {
 	title, err := getTitle(w, r)
@@ -126,23 +126,23 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	content := r.FormValue("content")
-	p := &Post{Title: title, Content: content} 
+	p := &Post{Title: title, Content: content}
 	err = p.save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	http.Redirect(w, r, "/show/" + title, http.StatusFound)
+	http.Redirect(w, r, "/show/"+title, http.StatusFound)
 }
 
 func createHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("title")
 	content := r.FormValue("content")
-	p := &Post{Title: title, Content: content} 
+	p := &Post{Title: title, Content: content}
 	err := p.save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	http.Redirect(w, r, "/show/" + title, http.StatusFound)
+	http.Redirect(w, r, "/show/"+title, http.StatusFound)
 }
 
 func newHandler(w http.ResponseWriter, r *http.Request) {
@@ -176,19 +176,26 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	posts, err := allPosts()
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// http.Error(w, err.Error(), http.StatusInternalServerError)
+		defer log.Fatal(err)
+		return
 	}
 
-	t, err := template.ParseFiles("index.html")
+	t, err := template.ParseFiles("templates/index.html")
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// http.Error(w, err.Error(), http.StatusInternalServerError)
+		// return
+		defer log.Fatal(err)
+		return
 	}
 
 	err = t.Execute(w, posts)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// http.Error(w, err.Error(), http.StatusInternalServerError)
+		defer log.Fatal(err)
+		return
 	}
 }
 
@@ -200,5 +207,5 @@ func main() {
 	http.HandleFunc("/new/", newHandler)
 	http.HandleFunc("/create/", createHandler)
 	http.HandleFunc("/delete/", deleteHandler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":3000", nil))
 }
