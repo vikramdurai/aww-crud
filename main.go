@@ -1,7 +1,10 @@
+/*
+blog-app-go is a simple CRUD (Create-Read-Update-Delete) application
+using the net/http library.
+*/
 package main
 
 import (
-	// "errors"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -13,12 +16,15 @@ import (
 
 var validPath = regexp.MustCompile("^/(edit|save|show|delete)/([a-zA-Z0-9]+)$")
 
+// Post is how posts are internally stored
 type Post struct {
 	Title   string
 	Content string
 }
 
-func (p *Post) save() error {
+// Save writes the Post to the "posts"
+// directory
+func (p *Post) Save() error {
 	filename := "posts/" + p.Title + ".txt"
 	err := ioutil.WriteFile(filename, []byte(p.Content), 0600)
 
@@ -29,7 +35,9 @@ func (p *Post) save() error {
 	return nil
 }
 
-func deletePost(title string) error {
+// DeletePost deletes a Post using the given "title"
+// from the "posts" directory
+func DeletePost(title string) error {
 	filename := "posts/" + title + ".txt"
 	err := os.Remove(filename)
 	if err != nil {
@@ -38,7 +46,9 @@ func deletePost(title string) error {
 	return nil
 }
 
-func loadPost(title string) (*Post, error) {
+// loadPost loads a Post using the given "title"
+// from the "posts" directory
+func LoadPost(title string) (*Post, error) {
 	filename := "posts/" + title + ".txt"
 	content, err := ioutil.ReadFile(filename)
 
@@ -51,14 +61,16 @@ func loadPost(title string) (*Post, error) {
 	return p, nil
 }
 
-func allPosts() ([]*Post, error) {
+// AllPosts returns an array of all posts
+// by looking into the "posts" directory
+func AllPosts() ([]*Post, error) {
 	posts := make([]*Post, 1)
 	files, err := ioutil.ReadDir("posts")
 	if err != nil {
 		return nil, err
 	}
 	for _, f := range files {
-		p, err := loadPost(strings.Trim(f.Name(), ".txt"))
+		p, err := LoadPost(strings.Trim(f.Name(), ".txt"))
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +107,7 @@ func showHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	p, err := loadPost(title)
+	p, err := LoadPost(title)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -110,7 +122,7 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	p, err := loadPost(title)
+	p, err := LoadPost(title)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -126,7 +138,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	content := r.FormValue("content")
 	p := &Post{Title: title, Content: content}
-	err = p.save()
+	err = p.Save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -162,7 +174,7 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	err = deletePost(title)
+	err = DeletePost(title)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -172,7 +184,7 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	posts, err := allPosts()
+	posts, err := AllPosts()
 
 	if err != nil {
 		// http.Error(w, err.Error(), http.StatusInternalServerError)
