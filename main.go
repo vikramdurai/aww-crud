@@ -18,19 +18,35 @@ type Post struct {
 	Content string
 }
 
-var (
-	cachedTitle string
-	cachedSlug string
-)
-
 func (p *Post) Slug() string {
-	if p.Title == cachedTitle {
-		return cachedSlug
-	} else {
-		cachedTitle = p.Title
-		cachedSlug = strings.Replace(strings.ToLower(cachedTitle), " ", "-", -1)
-		return cachedSlug
-	} 
+	// code pyramid XD
+	slug := strings.Replace(
+		strings.Replace(
+			strings.Replace(
+				strings.Replace(
+					strings.Replace(
+						strings.Replace(
+							strings.Replace(
+								strings.Replace(
+									strings.Replace(
+										strings.Replace(
+											strings.Replace(
+												strings.Replace(
+													strings.Replace(
+														strings.ToLower(p.Title), " ", "-", -1), 
+													"?", "", -1),
+												"&", "", -1),
+											":", "", -1),
+										"!", "", -1),
+									"@", "", -1),
+								"#", "", -1),
+							"$", "", -1),
+						"%", "", -1),
+					"^", "", -1),
+				"*", "", -1),
+			"(", "", -1),
+		")", "", -1)
+	return slug 
 }
 
 func (p *Post) Save() error {
@@ -82,7 +98,7 @@ func AllPosts() ([]*Post, error) {
 		return nil, err
 	}
 	for _, f := range files {
-		p, err := LoadPost(strings.Trim(f.Name(), ".json"))
+		p, err := LoadPost(strings.TrimSuffix(f.Name(), ".json"))
 		if err != nil {
 			return nil, err
 		}
