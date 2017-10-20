@@ -19,7 +19,6 @@ type Post struct {
 }
 
 func (p *Post) Slug() string {
-	// code pyramid XD
 	slug := strings.Replace(
 		strings.Replace(
 			strings.Replace(
