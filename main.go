@@ -1,12 +1,9 @@
-/*
-blog-app-go is a simple CRUD (Create-Read-Update-Delete) application
-using the net/http library.
-*/
 package main
 
 import (
 	"html/template"
 	"io/ioutil"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -14,19 +11,38 @@ import (
 	"strings"
 )
 
-var validPath = regexp.MustCompile("^/(edit|save|show|delete)/([a-zA-Z0-9]+)$")
+var validPath = regexp.MustCompile("^/(edit|save|show|delete)/([a-zA-Z0-9\\-]+)$")
 
-// Post is how posts are internally stored
 type Post struct {
 	Title   string
 	Content string
 }
 
-// Save writes the Post to the "posts"
-// directory
+var (
+	cachedTitle string
+	cachedSlug string
+)
+
+func (p *Post) Slug() string {
+	if p.Title == cachedTitle {
+		return cachedSlug
+	} else {
+		cachedTitle = p.Title
+		cachedSlug = strings.Replace(strings.ToLower(cachedTitle), " ", "-", -1)
+		return cachedSlug
+	} 
+}
+
 func (p *Post) Save() error {
-	filename := "posts/" + p.Title + ".txt"
-	err := ioutil.WriteFile(filename, []byte(p.Content), 0600)
+	filename := "posts/" + p.Slug() + ".json"
+
+	// serialize the data
+	fstring, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(filename, fstring, 0600)
 
 	if err != nil {
 		return err
@@ -35,10 +51,8 @@ func (p *Post) Save() error {
 	return nil
 }
 
-// DeletePost deletes a Post using the given "title"
-// from the "posts" directory
-func DeletePost(title string) error {
-	filename := "posts/" + title + ".txt"
+func DeletePost(slug string) error {
+	filename := "posts/" + slug + ".json"
 	err := os.Remove(filename)
 	if err != nil {
 		return err
@@ -46,31 +60,29 @@ func DeletePost(title string) error {
 	return nil
 }
 
-// loadPost loads a Post using the given "title"
-// from the "posts" directory
-func LoadPost(title string) (*Post, error) {
-	filename := "posts/" + title + ".txt"
-	content, err := ioutil.ReadFile(filename)
+func LoadPost(slug string) (*Post, error) {
+	filename := "posts/" + slug + ".json"
+	file, err := ioutil.ReadFile(filename)
 
 	if err != nil {
 		return nil, err
 	}
-
-	p := &Post{Title: title, Content: string(content)}
-
-	return p, nil
+	var p Post;
+	err = json.Unmarshal(file, &p)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
 }
 
-// AllPosts returns an array of all posts
-// by looking into the "posts" directory
 func AllPosts() ([]*Post, error) {
-	posts := make([]*Post, 1)
+	posts := make([]*Post, 0)
 	files, err := ioutil.ReadDir("posts")
 	if err != nil {
 		return nil, err
 	}
 	for _, f := range files {
-		p, err := LoadPost(strings.Trim(f.Name(), ".txt"))
+		p, err := LoadPost(strings.Trim(f.Name(), ".json"))
 		if err != nil {
 			return nil, err
 		}
@@ -93,36 +105,30 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Post) {
 	}
 }
 
-func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
+func getSlug(r *http.Request) (string) {
+	log.Printf("url %s", r.URL.Path)
 	m := validPath.FindStringSubmatch(r.URL.Path)
 	if m == nil {
-		log.Fatal("this should never happen")
+		log.Print("error: 'm' is nil")
 	}
-	return m[2], nil
+	log.Printf("slug is %s", m[2])
+	return m[2]
 }
 
 func showHandler(w http.ResponseWriter, r *http.Request) {
-	title, err := getTitle(w, r)
+	slug := getSlug(r)
+	p, err := LoadPost(slug)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	p, err := LoadPost(title)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Fatal(err)
 		return
 	}
 	renderTemplate(w, "show", p)
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request) {
-	title, err := getTitle(w, r)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	p, err := LoadPost(title)
+	slug := getSlug(r)
+	p, err := LoadPost(slug)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -131,29 +137,26 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request) {
-	title, err := getTitle(w, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	slug := getSlug(r)
+	title := r.FormValue("title")
 	content := r.FormValue("content")
 	p := &Post{Title: title, Content: content}
-	err = p.Save()
+	err := p.Save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	http.Redirect(w, r, "/show/"+title, http.StatusFound)
+	http.Redirect(w, r, "/show/" + slug, http.StatusFound)
 }
 
 func createHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("title")
 	content := r.FormValue("content")
 	p := &Post{Title: title, Content: content}
-	err := p.save()
+	err := p.Save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	http.Redirect(w, r, "/show/"+title, http.StatusFound)
+	http.Redirect(w, r, "/show/" + p.Slug(), http.StatusFound)
 }
 
 func newHandler(w http.ResponseWriter, r *http.Request) {
@@ -168,13 +171,8 @@ func newHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteHandler(w http.ResponseWriter, r *http.Request) {
-	title, err := getTitle(w, r)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = DeletePost(title)
+	slug := getSlug(r)
+	err := DeletePost(slug)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -218,5 +216,6 @@ func main() {
 	http.HandleFunc("/new/", newHandler)
 	http.HandleFunc("/create/", createHandler)
 	http.HandleFunc("/delete/", deleteHandler)
-	log.Fatal(http.ListenAndServe(":3000", nil))
+	log.Println("Starting server on localhost:5050/")
+	log.Fatal(http.ListenAndServe(":5050", nil))
 }

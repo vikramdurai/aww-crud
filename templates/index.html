@@ -15,9 +15,9 @@
 					{{if .}}
 						<tr>
 							<td>{{.Title}}</td>
-							<td><a href="/show/{{ .Title }}">show</a></td>
-							<td><a href="/edit/{{ .Title }}">edit</a></td>
-							<td><a href="/delete/{{ .Title }}">delete</a></td>
+							<td><a href="/show/{{ .Slug }}">show</a></td>
+							<td><a href="/edit/{{ .Slug }}">edit</a></td>
+							<td><a href="/delete/{{ .Slug }}">delete</a></td>
 						</tr>
 					{{end}}
 				{{end}}
