@@ -25,33 +25,15 @@ type Record struct {
 }
 
 func (r *Record) Slug() string {
-	slug := strings.Replace(
-		strings.Replace(
-			strings.Replace(
-				strings.Replace(
-					strings.Replace(
-						strings.Replace(
-							strings.Replace(
-								strings.Replace(
-									strings.Replace(
-										strings.Replace(
-											strings.Replace(
-												strings.Replace(
-													strings.Replace(
-														strings.ToLower(r.Title), " ", "-", -1), 
-													"?", "", -1),
-												"&", "", -1),
-											":", "", -1),
-										"!", "", -1),
-									"@", "", -1),
-								"#", "", -1),
-							"$", "", -1),
-						"%", "", -1),
-					"^", "", -1),
-				"*", "", -1),
-			"(", "", -1),
-		")", "", -1)
-	return slug 
+	slug := strings.ToLower(r.Title)
+
+	// replace spaces with -
+	slug = strings.Replace(slug, " ", "-", -1)
+
+	// strip unwanted characters
+	re := regexp.MustCompile("[?&:!@#$%^*()]")
+	
+	return re.ReplaceAllLiteralString(slug, "")
 }
 
 func (r *Record) Save() error {
