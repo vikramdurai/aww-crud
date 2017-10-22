@@ -1,3 +1,9 @@
+/*
+Presenting aww-crud: my first CRUD[1] app in go
+
+[1]: Full form is Create, Update, Delete
+*/
+
 package main
 
 import (
@@ -13,12 +19,12 @@ import (
 
 var validPath = regexp.MustCompile("^/(edit|save|show|delete)/([a-zA-Z0-9\\-]+)$")
 
-type Post struct {
+type Record struct {
 	Title   string
 	Content string
 }
 
-func (p *Post) Slug() string {
+func (r *Record) Slug() string {
 	slug := strings.Replace(
 		strings.Replace(
 			strings.Replace(
@@ -32,7 +38,7 @@ func (p *Post) Slug() string {
 											strings.Replace(
 												strings.Replace(
 													strings.Replace(
-														strings.ToLower(p.Title), " ", "-", -1), 
+														strings.ToLower(r.Title), " ", "-", -1), 
 													"?", "", -1),
 												"&", "", -1),
 											":", "", -1),
@@ -48,11 +54,11 @@ func (p *Post) Slug() string {
 	return slug 
 }
 
-func (p *Post) Save() error {
-	filename := "posts/" + p.Slug() + ".json"
+func (r *Record) Save() error {
+	filename := "records/" + r.Slug() + ".json"
 
 	// serialize the data
-	fstring, err := json.Marshal(p)
+	fstring, err := json.Marshal(r)
 	if err != nil {
 		return err
 	}
@@ -66,8 +72,8 @@ func (p *Post) Save() error {
 	return nil
 }
 
-func DeletePost(slug string) error {
-	filename := "posts/" + slug + ".json"
+func DeleteRecord(slug string) error {
+	filename := "records/" + slug + ".json"
 	err := os.Remove(filename)
 	if err != nil {
 		return err
@@ -75,46 +81,46 @@ func DeletePost(slug string) error {
 	return nil
 }
 
-func LoadPost(slug string) (*Post, error) {
-	filename := "posts/" + slug + ".json"
+func LoadRecord(slug string) (*Record, error) {
+	filename := "records/" + slug + ".json"
 	file, err := ioutil.ReadFile(filename)
 
 	if err != nil {
 		return nil, err
 	}
-	var p Post;
-	err = json.Unmarshal(file, &p)
+	var r Record;
+	err = json.Unmarshal(file, &r)
 	if err != nil {
 		return nil, err
 	}
-	return &p, nil
+	return &r, nil
 }
 
-func AllPosts() ([]*Post, error) {
-	posts := make([]*Post, 0)
-	files, err := ioutil.ReadDir("posts")
+func AllRecords() ([]*Record, error) {
+	records := make([]*Record, 0)
+	files, err := ioutil.ReadDir("records")
 	if err != nil {
 		return nil, err
 	}
 	for _, f := range files {
-		p, err := LoadPost(strings.TrimSuffix(f.Name(), ".json"))
+		r, err := LoadRecord(strings.TrimSuffix(f.Name(), ".json"))
 		if err != nil {
 			return nil, err
 		}
 
-		posts = append(posts, p)
+		records = append(records, r)
 	}
-	return posts, nil
+	return records, nil
 }
 
-func renderTemplate(w http.ResponseWriter, tmpl string, p *Post) {
+func renderTemplate(w http.ResponseWriter, tmpl string, r *Record) {
 	t, err := template.ParseFiles("templates/" + tmpl + ".html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	err = t.Execute(w, p)
+	err = t.Execute(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -132,46 +138,45 @@ func getSlug(r *http.Request) (string) {
 
 func showHandler(w http.ResponseWriter, r *http.Request) {
 	slug := getSlug(r)
-	p, err := LoadPost(slug)
+	rec, err := LoadRecord(slug)
 	if err != nil {
 		// http.Error(w, err.Error(), http.StatusInternalServerError)
 		log.Fatal(err)
 		return
 	}
-	renderTemplate(w, "show", p)
+	renderTemplate(w, "show", rec)
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request) {
 	slug := getSlug(r)
-	p, err := LoadPost(slug)
+	rec, err := LoadRecord(slug)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	renderTemplate(w, "edit", p)
+	renderTemplate(w, "edit", rec)
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request) {
-	slug := getSlug(r)
 	title := r.FormValue("title")
 	content := r.FormValue("content")
-	p := &Post{Title: title, Content: content}
-	err := p.Save()
+	rec := &Record{Title: title, Content: content}
+	err := rec.Save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	http.Redirect(w, r, "/show/" + slug, http.StatusFound)
+	http.Redirect(w, r, "/show/" + rec.Slug(), http.StatusFound)
 }
 
 func createHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("title")
 	content := r.FormValue("content")
-	p := &Post{Title: title, Content: content}
-	err := p.Save()
+	rec := &Record{Title: title, Content: content}
+	err := rec.Save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	http.Redirect(w, r, "/show/" + p.Slug(), http.StatusFound)
+	http.Redirect(w, r, "/show/" + rec.Slug(), http.StatusFound)
 }
 
 func newHandler(w http.ResponseWriter, r *http.Request) {
@@ -187,7 +192,7 @@ func newHandler(w http.ResponseWriter, r *http.Request) {
 
 func deleteHandler(w http.ResponseWriter, r *http.Request) {
 	slug := getSlug(r)
-	err := DeletePost(slug)
+	err := DeleteRecord(slug)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -197,8 +202,7 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	posts, err := AllPosts()
-
+	records, err := AllRecords()
 	if err != nil {
 		// http.Error(w, err.Error(), http.StatusInternalServerError)
 		defer log.Fatal(err)
@@ -214,7 +218,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = t.Execute(w, posts)
+	err = t.Execute(w, records)
 
 	if err != nil {
 		// http.Error(w, err.Error(), http.StatusInternalServerError)
