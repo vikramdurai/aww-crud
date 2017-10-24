@@ -7,9 +7,9 @@ Presenting aww-crud: my first CRUD[1] app in go
 package main
 
 import (
+	"encoding/json"
 	"html/template"
 	"io/ioutil"
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -32,7 +32,7 @@ func (r *Record) Slug() string {
 
 	// strip unwanted characters
 	re := regexp.MustCompile("[?&:!@#$%^*()]")
-	
+
 	return re.ReplaceAllLiteralString(slug, "")
 }
 
@@ -70,7 +70,7 @@ func LoadRecord(slug string) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	var r Record;
+	var r Record
 	err = json.Unmarshal(file, &r)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,11 @@ func LoadRecord(slug string) (*Record, error) {
 func AllRecords() ([]*Record, error) {
 	records := make([]*Record, 0)
 	files, err := ioutil.ReadDir("records")
-	if err != nil {
+	if os.IsNotExist(err) {
+		if err := os.Mkdir("records", os.ModePerm); err != nil {
+			return nil, err
+		}
+	} else if err != nil {
 		return nil, err
 	}
 	for _, f := range files {
@@ -108,7 +112,7 @@ func renderTemplate(w http.ResponseWriter, tmpl string, r *Record) {
 	}
 }
 
-func getSlug(r *http.Request) (string) {
+func getSlug(r *http.Request) string {
 	log.Printf("url %s", r.URL.Path)
 	m := validPath.FindStringSubmatch(r.URL.Path)
 	if m == nil {
@@ -147,7 +151,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	http.Redirect(w, r, "/show/" + rec.Slug(), http.StatusFound)
+	http.Redirect(w, r, "/show/"+rec.Slug(), http.StatusFound)
 }
 
 func createHandler(w http.ResponseWriter, r *http.Request) {
@@ -158,7 +162,7 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	http.Redirect(w, r, "/show/" + rec.Slug(), http.StatusFound)
+	http.Redirect(w, r, "/show/"+rec.Slug(), http.StatusFound)
 }
 
 func newHandler(w http.ResponseWriter, r *http.Request) {
