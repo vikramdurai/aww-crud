@@ -8,6 +8,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -189,21 +190,19 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	records, err := AllRecords()
 	if err != nil {
-		// http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Fatalf("unable to load all records: %v", err)
+		http.Error(w, fmt.Sprintf("unable to load all records: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	t, err := template.ParseFiles("templates/index.html")
 	if err != nil {
-		// http.Error(w, err.Error(), http.StatusInternalServerError)
-		// return
-		log.Fatalf("unable to parse file: %v", err)
+		http.Error(w, fmt.Sprintf("unable to parse file: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	err = t.Execute(w, records)
-
 	if err != nil {
-		log.Fatalf("unable to render template: %v", err)
+		http.Error(w, fmt.Sprintf("unable to render template: %v", err), http.StatusInternalServerError)
 	}
 }
 
