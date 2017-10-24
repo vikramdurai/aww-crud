@@ -4,7 +4,6 @@
 		<title>Crud Engine with net/http</title>
 	</head>
 	<body>
-        <a href="/">Back</a>
 		<h2>editing record {{ .Title }}</h2>
 		<form action="/save/{{ .Slug }}">
 			<input type="text" name="title" value="{{ .Title }}">
