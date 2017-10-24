@@ -66,7 +66,6 @@ func DeleteRecord(slug string) error {
 func LoadRecord(slug string) (*Record, error) {
 	filename := "records/" + slug + ".json"
 	file, err := ioutil.ReadFile(filename)
-
 	if err != nil {
 		return nil, err
 	}
@@ -191,25 +190,20 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	records, err := AllRecords()
 	if err != nil {
 		// http.Error(w, err.Error(), http.StatusInternalServerError)
-		defer log.Fatal(err)
-		return
+		log.Fatalf("unable to load all records: %v", err)
 	}
 
 	t, err := template.ParseFiles("templates/index.html")
-
 	if err != nil {
 		// http.Error(w, err.Error(), http.StatusInternalServerError)
 		// return
-		defer log.Fatal(err)
-		return
+		log.Fatalf("unable to parse file: %v", err)
 	}
 
 	err = t.Execute(w, records)
 
 	if err != nil {
-		// http.Error(w, err.Error(), http.StatusInternalServerError)
-		defer log.Fatal(err)
-		return
+		log.Fatalf("unable to render template: %v", err)
 	}
 }
 
