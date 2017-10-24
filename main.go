@@ -7,9 +7,11 @@ Presenting aww-crud: my first CRUD[1] app in go
 package main
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"html/template"
 	"io/ioutil"
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -32,7 +34,7 @@ func (r *Record) Slug() string {
 
 	// strip unwanted characters
 	re := regexp.MustCompile("[?&:!@#$%^*()]")
-	
+
 	return re.ReplaceAllLiteralString(slug, "")
 }
 
@@ -56,21 +58,19 @@ func (r *Record) Save() error {
 
 func DeleteRecord(slug string) error {
 	filename := "records/" + slug + ".json"
-	err := os.Remove(filename)
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.Remove(filename)
 }
 
 func LoadRecord(slug string) (*Record, error) {
+	if slug == "" {
+		return nil, errors.New("empty slug")
+	}
 	filename := "records/" + slug + ".json"
 	file, err := ioutil.ReadFile(filename)
-
 	if err != nil {
 		return nil, err
 	}
-	var r Record;
+	var r Record
 	err = json.Unmarshal(file, &r)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,11 @@ func LoadRecord(slug string) (*Record, error) {
 func AllRecords() ([]*Record, error) {
 	records := make([]*Record, 0)
 	files, err := ioutil.ReadDir("records")
-	if err != nil {
+	if os.IsNotExist(err) {
+		if err := os.Mkdir("records", os.ModePerm); err != nil {
+			return nil, err
+		}
+	} else if err != nil {
 		return nil, err
 	}
 	for _, f := range files {
@@ -108,11 +112,13 @@ func renderTemplate(w http.ResponseWriter, tmpl string, r *Record) {
 	}
 }
 
-func getSlug(r *http.Request) (string) {
+func getSlug(r *http.Request) string {
 	log.Printf("url %s", r.URL.Path)
 	m := validPath.FindStringSubmatch(r.URL.Path)
 	if m == nil {
 		log.Print("error: 'm' is nil")
+		// leave early or this will panic as it will be a index out of bounds
+		return ""
 	}
 	log.Printf("slug is %s", m[2])
 	return m[2]
@@ -122,8 +128,7 @@ func showHandler(w http.ResponseWriter, r *http.Request) {
 	slug := getSlug(r)
 	rec, err := LoadRecord(slug)
 	if err != nil {
-		// http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Fatal(err)
+		http.Error(w, fmt.Sprintf("did not find the desired record: %v", err), http.StatusInternalServerError)
 		return
 	}
 	renderTemplate(w, "show", rec)
@@ -146,8 +151,10 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	err := rec.Save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// do not redirect or error message will be lost
+		return
 	}
-	http.Redirect(w, r, "/show/" + rec.Slug(), http.StatusFound)
+	http.Redirect(w, r, "/show/"+rec.Slug(), http.StatusFound)
 }
 
 func createHandler(w http.ResponseWriter, r *http.Request) {
@@ -157,8 +164,10 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 	err := rec.Save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// do not redirect or error message will be lost
+		return
 	}
-	http.Redirect(w, r, "/show/" + rec.Slug(), http.StatusFound)
+	http.Redirect(w, r, "/show/"+rec.Slug(), http.StatusFound)
 }
 
 func newHandler(w http.ResponseWriter, r *http.Request) {
@@ -186,26 +195,19 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	records, err := AllRecords()
 	if err != nil {
-		// http.Error(w, err.Error(), http.StatusInternalServerError)
-		defer log.Fatal(err)
+		http.Error(w, fmt.Sprintf("unable to load all records: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	t, err := template.ParseFiles("templates/index.html")
-
 	if err != nil {
-		// http.Error(w, err.Error(), http.StatusInternalServerError)
-		// return
-		defer log.Fatal(err)
+		http.Error(w, fmt.Sprintf("unable to parse file: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	err = t.Execute(w, records)
-
 	if err != nil {
-		// http.Error(w, err.Error(), http.StatusInternalServerError)
-		defer log.Fatal(err)
-		return
+		http.Error(w, fmt.Sprintf("unable to render template: %v", err), http.StatusInternalServerError)
 	}
 }
 
