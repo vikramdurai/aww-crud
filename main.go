@@ -8,6 +8,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -57,14 +58,13 @@ func (r *Record) Save() error {
 
 func DeleteRecord(slug string) error {
 	filename := "records/" + slug + ".json"
-	err := os.Remove(filename)
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.Remove(filename)
 }
 
 func LoadRecord(slug string) (*Record, error) {
+	if slug == "" {
+		return nil, errors.New("empty slug")
+	}
 	filename := "records/" + slug + ".json"
 	file, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -117,6 +117,8 @@ func getSlug(r *http.Request) string {
 	m := validPath.FindStringSubmatch(r.URL.Path)
 	if m == nil {
 		log.Print("error: 'm' is nil")
+		// leave early or this will panic as it will be a index out of bounds
+		return ""
 	}
 	log.Printf("slug is %s", m[2])
 	return m[2]
@@ -126,8 +128,7 @@ func showHandler(w http.ResponseWriter, r *http.Request) {
 	slug := getSlug(r)
 	rec, err := LoadRecord(slug)
 	if err != nil {
-		// http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Fatal(err)
+		http.Error(w, fmt.Sprintf("did not find the desired record: %v", err), http.StatusInternalServerError)
 		return
 	}
 	renderTemplate(w, "show", rec)
@@ -150,6 +151,8 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	err := rec.Save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// do not redirect or error message will be lost
+		return
 	}
 	http.Redirect(w, r, "/show/"+rec.Slug(), http.StatusFound)
 }
@@ -161,6 +164,8 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 	err := rec.Save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// do not redirect or error message will be lost
+		return
 	}
 	http.Redirect(w, r, "/show/"+rec.Slug(), http.StatusFound)
 }
